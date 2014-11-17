@@ -66,19 +66,22 @@ iterateBoard board =
     let rowCount = length board
         columnCount = boardColumnCount board
     in
-        pCartProd [0..rowCount-1] [0..columnCount-1] |> map (\row ->
-            row |> map (\coordinate -> conwayRules board coordinate))
+        [0..rowCount-1] |> map (\row ->
+            [0..columnCount-1] |> map (\column ->
+                conwayRules board (row, column)))
 
 -- RENDERING
 
-g = [[Dead, Alive, Dead, Dead, Dead],
+{-g = [[Dead, Alive, Dead, Dead, Dead],
      [Dead, Alive, Dead, Dead, Dead],
      [Dead, Alive, Dead, Dead, Dead],
      [Dead, Dead, Dead, Dead, Dead],
-     [Dead, Dead, Dead, Dead, Dead]]
+     [Dead, Dead, Dead, Dead, Dead]]-}
 
-height = 400
-width = 400
+g = [[Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Dead,Dead,Alive,Dead,Alive,Dead,Dead],[Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Alive,Dead,Dead,Alive,Dead,Dead,Dead],[Dead,Dead,Alive,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Dead],[Alive,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Dead,Alive,Dead,Dead,Alive,Dead,Dead,Alive,Dead,Dead],[Dead,Alive,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead],[Dead,Alive,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead],[Dead,Alive,Dead,Alive,Dead,Alive,Dead,Alive,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead],[Dead,Alive,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Dead,Alive,Dead,Alive,Dead,Dead,Dead,Dead,Dead,Dead],[Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Dead,Dead,Dead,Alive],[Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Alive,Alive,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead],[Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Alive,Dead,Alive,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead],[Dead,Dead,Alive,Dead,Alive,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Dead,Dead,Dead,Dead],[Dead,Dead,Dead,Alive,Dead,Alive,Alive,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Alive,Alive,Alive,Dead],[Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Alive,Alive,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead],[Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead],[Dead,Dead,Dead,Alive,Dead,Alive,Alive,Alive,Dead,Dead,Dead,Alive,Dead,Dead,Alive,Dead,Dead,Dead,Dead,Dead],[Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Alive,Dead,Alive],[Alive,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Dead,Dead,Alive,Alive,Dead],[Alive,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Alive,Dead,Alive,Dead,Dead,Dead,Dead],[Dead,Dead,Alive,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Dead,Alive,Dead,Dead,Dead,Alive,Dead,Dead]]
+
+height = 600
+width = 600
 
 drawBoard : Board -> Element
 drawBoard board =
@@ -89,16 +92,93 @@ drawBoard board =
         yOffset = (height - cellSize) / 2
     in
         collage height width
-            (cartProd [0..rowCount-1] [0..columnCount-1] |> map (\coordinate ->
+            ((cartProd [0..rowCount-1] [0..columnCount-1] |> map (\coordinate ->
                 let status = getNodeAt board coordinate
                     cellColor = (if status == Alive then lightGrey else charcoal)
                     x = xOffset + (toFloat (snd coordinate)) * cellSize
                     y = yOffset - (toFloat (fst coordinate)) * cellSize
                 in
-                    square cellSize
+                    [square cellSize
                         |> filled cellColor
-                        |> move (x, y)))
+                        |> move (x, y),
+                     square cellSize
+                        |> outlined (solid black)
+                        |> move (x, y)]))
+            |> foldr (++) [])
 
+
+-- TESTS
+{-
+type Test = {description: String, initialBoard: Board, passes: (Board -> Bool)}
+type TestResult = (Test, Bool)
+
+runTest : Test -> TestResult
+runTest test = (test, test.passes test.initialBoard)
+
+expectBoard : Board -> (Board -> Bool)
+expectBoard expectedBoard = (\board -> expectedBoard == iterateBoard board)
+
+showTests : [Test] -> Element
+showTests tests = flow down (map runTest tests |> map (\testResult ->
+    let test = fst testResult
+        result = if (snd testResult) then "Success" else "Failed"
+    in
+        plainText <| test.description ++ ": " ++ result))
+
+tests = [
+    {description="A cell with 0 living neighbors dies",
+     initialBoard=[[Alive, Dead, Dead], [Dead, Dead, Dead], [Dead, Dead, Dead]],
+     passes=(\board -> Dead == conwayRules board (0, 0))},
+    {description="A cell with 1 living neighbor dies",
+     initialBoard=[[Alive, Alive, Dead], [Dead, Dead, Dead], [Dead, Dead, Dead]],
+     passes=(\board -> Dead == conwayRules board (0, 0))},
+    {description="A live cell with 2 living neighbors lives",
+     initialBoard=[[Dead, Alive, Dead], [Alive, Dead, Alive], [Dead, Dead, Dead]],
+     passes=(\board -> Alive == conwayRules board (0, 1))},
+    {description="A dead cell with 2 living neighbors is dead",
+     initialBoard=[[Dead, Dead, Dead], [Alive, Dead, Alive], [Dead, Dead, Dead]],
+     passes=(\board -> Dead == conwayRules board (0, 1))},
+    {description="A live cell with 3 living neighbors lives",
+     initialBoard=[[Dead, Alive, Dead], [Alive, Alive, Alive], [Dead, Dead, Dead]],
+     passes=(\board -> Alive == conwayRules board (0, 1))},
+    {description="A dead cell with 3 living neighbors becomes alive",
+     initialBoard=[[Dead, Dead, Dead], [Alive, Alive, Alive], [Dead, Dead, Dead]],
+     passes=(\board -> Alive == conwayRules board (0, 1))},
+    {description="A live cell with 4 living neighbors dies",
+     initialBoard=[[Alive, Alive, Dead], [Alive, Alive, Alive], [Dead, Dead, Dead]],
+     passes=(\board -> Dead == conwayRules board (0, 1))},
+    {description="A live cell with 5 living neighbors dies",
+     initialBoard=[[Alive, Alive, Alive], [Alive, Alive, Alive], [Dead, Dead, Dead]],
+     passes=(\board -> Dead == conwayRules board (0, 1))},
+    {description="A live cell with 6 living neighbors dies",
+     initialBoard=[[Alive, Alive, Alive], [Alive, Alive, Alive], [Alive, Dead, Dead]],
+     passes=(\board -> Dead == conwayRules board (1, 1))},
+    {description="A live cell with 7 living neighbors dies",
+     initialBoard=[[Alive, Alive, Alive], [Alive, Alive, Alive], [Alive, Alive, Dead]],
+     passes=(\board -> Dead == conwayRules board (1, 1))},
+    {description="A live cell with 8 living neighbors dies",
+     initialBoard=[[Alive, Alive, Alive], [Alive, Alive, Alive], [Alive, Alive, Alive]],
+     passes=(\board -> Dead == conwayRules board (1, 1))},
+    {description="A basic oscillator oscillates",
+     initialBoard=[[Dead, Alive, Dead], [Dead, Alive, Dead], [Dead, Alive, Dead]],
+     passes=(expectBoard [[Dead, Dead, Dead], [Alive, Alive, Alive], [Dead, Dead, Dead]])},
+    {description="The (0, 1) cell in the oscillator dies",
+     initialBoard=[[Dead, Alive, Dead], [Dead, Alive, Dead], [Dead, Alive, Dead]],
+     passes=(\board -> Dead == conwayRules board (0, 1))},
+    {description="The (1, 0) cell in the oscillator is born",
+     initialBoard=[[Dead, Alive, Dead], [Dead, Alive, Dead], [Dead, Alive, Dead]],
+     passes=(\board -> Alive == conwayRules board (1, 0))},
+    {description="The (1, 1) cell in the oscillator lives",
+     initialBoard=[[Dead, Alive, Dead], [Dead, Alive, Dead], [Dead, Alive, Dead]],
+     passes=(\board -> Alive == conwayRules board (1, 1))},
+    {description="The (1, 2) cell in the oscillator is born",
+     initialBoard=[[Dead, Alive, Dead], [Dead, Alive, Dead], [Dead, Alive, Dead]],
+     passes=(\board -> Alive == conwayRules board (1, 2))},
+    {description="The (2, 1) cell in the oscillator dies",
+     initialBoard=[[Dead, Alive, Dead], [Dead, Alive, Dead], [Dead, Alive, Dead]],
+     passes=(\board -> Dead == conwayRules board (2, 1))}
+     ]
+-}
 
 main : Signal Element
-main = drawBoard <~ (foldp (\time -> iterateBoard) g (every second))
+main = drawBoard <~ (foldp (\time -> iterateBoard) g (every <| 400 * millisecond))
